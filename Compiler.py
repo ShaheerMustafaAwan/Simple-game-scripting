@@ -152,3 +152,65 @@ class Parser:
 
         else:
             raise SyntaxError(f"Unexpected token {tok.type} at pos {tok.pos}")
+
+# ------------------------------------
+# SEMANTIC ANALYSIS
+# ------------------------------------
+class SemanticError(Exception):
+    pass
+
+def semantic_check(program: Program):
+    for s in program.statements:
+        if s.kind in ("MOVE", "JUMP"):
+            if s.arg < 0:
+                raise SemanticError(
+                    f"Argument must be >=0 at pos {s.pos} (got {s.arg})"
+                )
+        if s.kind == "TURN" and s.subkind not in ("LEFT", "RIGHT"):
+            raise SemanticError(f"Invalid direction at pos {s.pos}")
+
+# ------------------------------------
+# THREE-ADDRESS CODE (TAC)
+# ------------------------------------
+@dataclass
+class TACInstr:
+    op: str
+    arg: Optional[str] = None
+    arg2: Optional[str] = None
+    result: Optional[str] = None
+
+    def __str__(self):
+        parts = [self.op]
+        if self.arg is not None: parts.append(str(self.arg))
+        if self.arg2 is not None: parts.append(str(self.arg2))
+        if self.result is not None: parts.append("-> " + str(self.result))
+        return " ".join(parts)
+
+def generate_tac(program: Program):
+    tac = []
+    tcount = 0
+
+    def temp():
+        nonlocal tcount
+        tcount += 1
+        return f"t{tcount}"
+
+    for s in program.statements:
+
+        if s.kind == "MOVE":
+            t = temp()
+            tac.append(TACInstr("assign", str(s.arg), result=t))
+            tac.append(TACInstr("call", "move", arg2=t))
+
+        elif s.kind == "JUMP":
+            t = temp()
+            tac.append(TACInstr("assign", str(s.arg), result=t))
+            tac.append(TACInstr("call", "jump", arg2=t))
+
+        elif s.kind == "TURN":
+            tac.append(TACInstr("call", f"turn_{s.subkind.lower()}"))
+
+        elif s.kind == "ATTACK":
+            tac.append(TACInstr("call", "attack"))
+
+    return tac
