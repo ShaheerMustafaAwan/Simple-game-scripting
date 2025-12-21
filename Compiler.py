@@ -214,3 +214,156 @@ def generate_tac(program: Program):
             tac.append(TACInstr("call", "attack"))
 
     return tac
+
+# ------------------------------------
+# CODE GENERATION / EXECUTION
+# ------------------------------------
+def exec_TAC(tac: List[TACInstr]):
+    env = {}
+
+    for instr in tac:
+        if instr.op == "assign":
+            env[instr.result] = int(instr.arg)
+
+        elif instr.op == "call":
+            func = instr.arg
+            x = env.get(instr.arg2) if instr.arg2 else None
+
+            if func == "move":
+                print(f"[SIM] MOVE {x}")
+            elif func == "jump":
+                print(f"[SIM] JUMP {x}")
+            elif func == "turn_left":
+                print("[SIM] TURN LEFT")
+            elif func == "turn_right":
+                print("[SIM] TURN RIGHT")
+            elif func == "attack":
+                print("[SIM] ATTACK")
+            else:
+                raise RuntimeError(f"Unknown call {func}")
+
+# ------------------------------------
+# DRIVER
+# ------------------------------------
+def run_demo():
+    print("=== BASIC Movement DSL Demo ===\n")
+    print("Source:")
+    print(SAMPLE.strip())
+    print("\n=== AST ===")
+    program, tac = compile_and_run(SAMPLE, show_ast=True, show_tac=False)
+
+def print_ast(program: Program):
+    print("\n=== AST ===")
+    for s in program.statements:
+        print(f"  Stmt(kind={s.kind}, subkind={s.subkind}, arg={s.arg})")
+
+def compile_and_run(text: str, show_ast=False, show_tac=False):
+
+    text = text.lstrip() 
+
+    # --- LEXING ---
+    tokens = lex(text)
+
+    # NEW: Print tokens
+    print("=== TOKENS ===")
+    for t in tokens:
+        print(f"  Token(type={t.type}, value={t.value}, pos={t.pos})")
+
+    # --- PARSING ---
+    parser = Parser(tokens)
+    program = parser.parse()
+
+    
+    print("\n=== PARSE TREE ===")
+    for stmt in program.statements:
+        print("Stmt")
+        print(f" ├── kind: {stmt.kind}")
+        if stmt.arg is not None:
+            print(f" ├── arg: {stmt.arg}")
+        if stmt.subkind is not None:
+            print(f" ├── subkind: {stmt.subkind}")
+        print(f" └── pos: {stmt.pos}")
+
+    
+    if show_ast:
+        print_ast(program)
+
+    # --- SEMANTIC ANALYSIS ---
+    semantic_check(program)
+
+    # --- TAC GENERATION ---
+    tac = generate_tac(program)
+
+    print("\n=== TAC ===")
+    for i, t in enumerate(tac):
+        print(f"{i:03}: {t}")
+
+    # --- EXECUTION ---
+    print("\n=== EXECUTION ===")
+    exec_TAC(tac)
+
+    print("\n=== End Demo ===")
+
+    return program, tac
+
+
+
+# DEMO
+# SAMPLE = """
+# MOVE 5;
+# TURN LEFT;
+# MOVE 2;
+# JUMP 3;
+# ATTACK;
+# """
+
+# SAMPLE = """
+# JUMP 3; TURN RIGHT; MOVE 2;
+# """
+
+# SAMPLE = """
+# MOVE 10; TURN LEFT; JUMP 5; TURN RIGHT;
+# """
+
+# SAMPLE = """
+# ATTACK; MOVE 1; ATTACK;
+# """
+
+SAMPLE = """
+TURN LEFT; TURN RIGHT; MOVE 8;
+"""
+
+if __name__ == "__main__":
+
+    parser_cli = argparse.ArgumentParser(description="Game Movement DSL Compiler (No Regex)")
+    parser_cli.add_argument("file", nargs="?", help="Path to input .gm source file")
+    parser_cli.add_argument("--show-ast", action="store_true", help="Show AST")
+    parser_cli.add_argument("--show-tac", action="store_true", help="Show TAC")
+    parser_cli.add_argument("--demo", action="store_true", help="Run built-in demo program")
+
+    args = parser_cli.parse_args()
+
+    # --- If user runs demo ---
+    if args.demo or (args.file is None):
+        print("=== Running Demo Mode ===\n")
+        compile_and_run(SAMPLE, show_ast=True, show_tac=True)
+        sys.exit(0)
+
+    # --- If file is provided ---
+    try:
+        with open(args.file, "r") as f:
+            source_code = f.read()
+    except FileNotFoundError:
+        print(f"ERROR: File '{args.file}' not found.")
+        sys.exit(1)
+
+    print(f"=== Compiling file: {args.file} ===\n")
+
+    try:
+        compile_and_run(source_code, show_ast=args.show_ast, show_tac=args.show_tac)
+    except SyntaxError as e:
+        print("Syntax Error:", e)
+    except SemanticError as e:
+        print("Semantic Error:", e)
+    except Exception as e:
+        print("Runtime Error:", e)
