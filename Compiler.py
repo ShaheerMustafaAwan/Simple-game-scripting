@@ -78,7 +78,7 @@ def lex(text: str) -> List[Token]:
     return tokens
 
 # ------------------------------------
-# AST NODES
+# AST NODES (Abstract Syntax Tree)
 # ------------------------------------
 @dataclass
 class ASTNode:
@@ -216,6 +216,49 @@ def generate_tac(program: Program):
     return tac
 
 # ------------------------------------
+# OPTIMIZATION (PHASE 5)
+# ------------------------------------
+def optimize_tac(tac: List[TACInstr]) -> List[TACInstr]:
+    """
+    Performs:
+    1. Redundant Turn Elimination (LEFT followed by RIGHT)
+    2. Dead Code Elimination (MOVE 0 or JUMP 0)
+    """
+    if not tac:
+        return tac
+    
+    optimized = []
+    i = 0
+    while i < len(tac):
+        curr = tac[i]
+
+        # --- 1. Dead Code Elimination (MOVE 0 / JUMP 0) ---
+        # If we see an 'assign 0 -> tX', and the next instr is a call using that tX
+        if curr.op == "assign" and curr.arg == "0":
+            if i + 1 < len(tac):
+                nxt = tac[i+1]
+                if nxt.op == "call" and nxt.arg in ("move", "jump") and nxt.arg2 == curr.result:
+                    print(f"[OPT] Removing dead code: {nxt.arg} 0")
+                    i += 2 # Skip the assign AND the call
+                    continue
+
+        # --- 2. Redundant Turn Elimination ---
+        if i + 1 < len(tac):
+            nxt = tac[i+1]
+            is_cancel = (
+                (curr.arg == "turn_left" and nxt.arg == "turn_right") or
+                (curr.arg == "turn_right" and nxt.arg == "turn_left")
+            )
+            if is_cancel:
+                print(f"[OPT] Removing redundant: {curr.arg} & {nxt.arg}")
+                i += 2
+                continue
+        
+        optimized.append(curr)
+        i += 1
+    return optimized
+
+# ------------------------------------
 # CODE GENERATION / EXECUTION
 # ------------------------------------
 def exec_TAC(tac: List[TACInstr]):
@@ -294,13 +337,17 @@ def compile_and_run(text: str, show_ast=False, show_tac=False):
     # --- TAC GENERATION ---
     tac = generate_tac(program)
 
-    print("\n=== TAC ===")
-    for i, t in enumerate(tac):
+    # --- OPTIMIZATION (NEW PHASE) ---
+    print("\n=== OPTIMIZATION ===")
+    optimized_tac = optimize_tac(tac)
+
+    print("\n=== FINAL OPTIMIZED TAC ===")
+    for i, t in enumerate(optimized_tac):
         print(f"{i:03}: {t}")
 
     # --- EXECUTION ---
     print("\n=== EXECUTION ===")
-    exec_TAC(tac)
+    exec_TAC(optimized_tac) # Run the optimized version!
 
     print("\n=== End Demo ===")
 
@@ -332,6 +379,10 @@ def compile_and_run(text: str, show_ast=False, show_tac=False):
 SAMPLE = """
 TURN LEFT; TURN RIGHT; MOVE 8;
 """
+
+# SAMPLE = """
+# TURN LEFT; TURN RIGHT; MOVE 0; Attack;
+# """
 
 if __name__ == "__main__":
 
