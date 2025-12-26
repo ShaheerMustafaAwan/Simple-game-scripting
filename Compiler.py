@@ -353,36 +353,9 @@ def compile_and_run(text: str, show_ast=False, show_tac=False):
 
     return program, tac
 
-
-
-# DEMO
-# SAMPLE = """
-# MOVE 5;
-# TURN LEFT;
-# MOVE 2;
-# JUMP 3;
-# ATTACK;
-# """
-
-# SAMPLE = """
-# JUMP 3; TURN RIGHT; MOVE 2;
-# """
-
-# SAMPLE = """
-# MOVE 10; TURN LEFT; JUMP 5; TURN RIGHT;
-# """
-
-# SAMPLE = """
-# ATTACK; MOVE 1; ATTACK;
-# """
-
 SAMPLE = """
-TURN LEFT; TURN RIGHT; MOVE 8;
+TURN LEFT; TURN RIGHT; MOVE 0; Attack;
 """
-
-# SAMPLE = """
-# TURN LEFT; TURN RIGHT; MOVE 0; Attack;
-# """
 
 if __name__ == "__main__":
 
